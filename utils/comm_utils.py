@@ -30,7 +30,7 @@ def getAchRate(losses,power,noise,apID):
 
         power_sig = power_rec[apID[i],i]
         power_inf_noise = np.sum(power_rec[:,i]) - power_sig + noise
-        acc_rate[i] = np.log2(1 + power_sig * 1/power_inf_noise)
+        acc_rate[i] = np.log2(1 + power_sig/power_inf_noise)
 
     return acc_rate
 
