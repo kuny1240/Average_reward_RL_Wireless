@@ -12,8 +12,8 @@ class QLearner:
     def __init__(self, mac, device, batch_size, num_feats, est_type):
         self.mac = mac
         self.target_mac = copy.deepcopy(mac)
-        self.memory = RecurrentExperienceReplayMemory(capacity=1000, sequence_length=batch_size)
-        self.seq_len = batch_size
+        self.memory = RecurrentExperienceReplayMemory(capacity=1000, sequence_length=1)
+        self.seq_len = 1
         self.device = device
         self.batch_size = batch_size
         self.num_feats = num_feats
@@ -65,6 +65,7 @@ class QLearner:
 
 
 #         breakpoint()
+#         norm = torch.nn.Functional.normalize()
         batch = self.prep_minibatch()
         mac_out = []
         tar_mac_out = []
@@ -72,7 +73,7 @@ class QLearner:
         batch_state, batch_action, batch_reward, batch_next_state = batch
         batch_state = torch.reshape(batch_state, (self.batch_size,self.seq_len,-1))
 
-        for i in range(self.batch_size):
+        for i in range(self.seq_len):
             cur_state = batch_state[:,i]
 #             batch_out, hidden_state = self.mac.forward(cur_state)
             batch_out = self.mac.forward(cur_state)
@@ -88,14 +89,17 @@ class QLearner:
 
         # Pick the Q-Values for the actions taken by each agent
         chosen_action_qvals = mac_out.gather(1, batch_action).squeeze()  # Remove the last dim
+        chosen_action_qvals = torch.nn.functional.normalize(chosen_action_qvals,dim=0)
+#         chosen_action_qvals = norm(chosen_action_qvals)
         target_chosen_qvals = tar_mac_out.gather(1, batch_action).squeeze()
+#         target_chosen_qvals = norm(target_chosen_qvals)
 
         # Calculate the Q-Values necessary for the target
 
         target_mac_out = []
         batch_next_state = torch.reshape(batch_next_state, (self.batch_size, self.seq_len, -1))
 
-        for i in range(self.batch_size):
+        for i in range(self.seq_len):
             cur_state = batch_next_state[:,i]
 #             batch_next_out, hidden_state = self.mac.forward(cur_state)
             batch_next_out = self.target_mac.forward(cur_state)
@@ -109,15 +113,18 @@ class QLearner:
 
         # Get actions that maximise live Q (for double q-learning)
         target_max_qvals = target_mac_out.max(dim=1)[0]
+#         target_max_qvals = norm(target_max_qvals)
         # target_max_qvals = torch.gather(target_mac_out, 2, cur_max_actions).squeeze(3)
 
         # Calculate 1-step Q-Learning targets
         batch_reward = torch.flatten(batch_reward)
+#         batch_reward = norm(batch_reward)
 #         avg_reward = torch.mean(batch_reward)
         
         
         if self.est_type == "discounted":
             targets = batch_reward + self.gamma * target_max_qvals
+            targets = torch.nn.functional.normalize(targets,dim=0)
         else:
             targets = batch_reward - self.tar_avg_reward + target_max_qvals
             self.eva_avg_reward += 0.01 * ( torch.mean(batch_reward - self.eva_avg_reward + target_max_qvals - target_chosen_qvals)).item()
@@ -125,13 +132,18 @@ class QLearner:
 
         # Td-error
 #         pdb.set_trace()
-        td_error = chosen_action_qvals - targets.detach()
-        bad_id = torch.argsort(torch.abs(td_error))
+#         td_error = chosen_action_qvals - targets.detach()
+#         bad_id = torch.argsort(torch.abs(td_error))
 
         # Normal L2 loss, take mean over actual data
-        loss = (td_error ** 2).mean()  # + self.normalization_const * avg_difference
+#         loss = (td_error ** 2).mean()  # + self.normalization_const * avg_difference
 
         # Optimise
+#         loss_func = torch.nn.HuberLoss()
+        loss_func = torch.nn.MSELoss(reduction = "sum")
+        loss = loss_func(targets.detach(), chosen_action_qvals)
+        if loss > 1000:
+            pdb.set_trace()
         self.optimiser.zero_grad()
         loss.backward()
         # print(loss)
