@@ -20,15 +20,23 @@ class DRQN(nn.Module):
 
         self.gru_size = gru_size
         self.fc1 = nn.Linear(input_shape, gru_size)
-        self.rnn = nn.GRUCell(gru_size, gru_size)
+#         self.rnn = nn.GRUCell(gru_size, gru_size)
         self.fc2 = nn.Linear(gru_size, num_actions)
 
-    def forward(self, inputs, hidden_state):
+#     def forward(self, inputs, hidden_state):
+#         x = F.relu(self.fc1(inputs))
+# #         h_in = hidden_state.reshape(-1, self.gru_size)
+# #         h = self.rnn(x, h_in)
+#         q = F.tanh(self.fc2(x))
+#         return q, h
+    
+    
+    def forward(self, inputs):
         x = F.relu(self.fc1(inputs))
-        h_in = hidden_state.reshape(-1, self.gru_size)
-        h = self.rnn(x, h_in)
-        q = self.fc2(h)
-        return q, h
+#         h_in = hidden_state.reshape(-1, self.gru_size)
+#         h = self.rnn(x, h_in)
+        q = self.fc2(x)
+        return q
 
 
 

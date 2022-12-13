@@ -31,7 +31,7 @@ class DRQN_Agent:
             breakpoint()
         with torch.no_grad():
             if np.random.random() >= eps:
-                q_value, hidden = self.forward(s)
+                q_value = self.forward(s)
                 a = q_value.argmax(dim=-1)
                 return a.item(), q_value
             else:
@@ -46,14 +46,19 @@ class DRQN_Agent:
         # ep_batch.shape == [batch, n_agents, limited_n_ues, 4(No., x, y, patience)]
         batch = ep_batch.shape[0]
         agent_inputs = ep_batch.view(batch, -1)
-        agent_outs, self.hidden_states = self.agent(agent_inputs, self.hidden_states)
+#         agent_outs, self.hidden_states = self.agent(agent_inputs, self.hidden_states)
+        agent_outs = self.agent(agent_inputs)
 
-        return agent_outs.view(batch, -1), self.hidden_states.view(batch, -1)
+#         return agent_outs.view(batch, -1), self.hidden_states.view(batch, -1)
 
-    def init_hidden(self, batch_size):
-        self.hidden_states = Variable(torch.zeros(1, batch_size, self.agent.gru_size).float())  # bav
-        if self.cuda_flag:
-            self.hidden_states = self.hidden_states.cuda()
+
+        return agent_outs.view(batch, -1)
+        
+
+#     def init_hidden(self, batch_size):
+#         self.hidden_states = Variable(torch.zeros(1, batch_size, self.agent.gru_size).float())  # bav
+#         if self.cuda_flag:
+#             self.hidden_states = self.hidden_states.cuda()
 
     def parameters(self):
         return self.agent.parameters()

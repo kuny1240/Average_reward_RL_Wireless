@@ -2,6 +2,8 @@ import numpy as np
 import math
 import random
 import matplotlib.pyplot as plt
+import pdb
+import copy
 
 def getDist(appos, uepos):
 
@@ -16,7 +18,7 @@ def getDist(appos, uepos):
 
     return dists
 
-def getAchRate(losses,power,noise,apID):
+def getAccRate(losses,power,noise,apID):
 
     losses_sqr = 10 ** (losses / 10)
 
@@ -30,7 +32,7 @@ def getAchRate(losses,power,noise,apID):
 
         power_sig = power_rec[apID[i],i]
         power_inf_noise = np.sum(power_rec[:,i]) - power_sig + noise
-        acc_rate[i] = np.log2(1 + power_sig/power_inf_noise)
+        acc_rate[i] = np.log2(1 + power_sig * 1/power_inf_noise)
 
     return acc_rate
 
@@ -47,7 +49,7 @@ def getInfpower(losses,power,apID):
         power_sig = power_rec[apID[i],i]
         infpower[i] = np.sum(power_rec[:,i], 0) - power_sig
 
-    return  infpower
+    return infpower
 
 def getSINR(losses,infpower,noise, apID):
 
@@ -71,7 +73,9 @@ def getSINR(losses,infpower,noise, apID):
 
 def APgen(area_range, apnum, min_dist, paint = False):
 
-    pos = np.zeros((apnum,2))
+
+
+    pos = np.zeros((apnum,2)) - 100
 
     # if apnum == 2:
     #     pos[0,0] = 200
@@ -81,6 +85,7 @@ def APgen(area_range, apnum, min_dist, paint = False):
 
     for i in range(apnum):
 
+        # The AP pairs also have a min distance
         while True:
             xpos = random.random() * area_range
             ypos = random.random() * area_range
@@ -100,10 +105,11 @@ def APgen(area_range, apnum, min_dist, paint = False):
 
 def UEgen(appos,area_range,uenum,min_dist,paint = False ):
 
-    uepos = np.zeros((uenum,2))
+    uepos = np.zeros((uenum,2)) - 100
 
     for i in range(uenum):
 
+        # Each UE must maintain a minimum dist between AP
         while True:
 
             xpos = random.random() * area_range
@@ -203,6 +209,25 @@ def rayleigh_fading(x_dim, y_dim):
     return z_mag_dB
 
 
+def state_normalization(states,state_max,state_min, Q):
+
+    stages = np.array(list(range(Q + 1)))/ Q
+    normalized_stages = stages - 1/2
+    diff = state_max - state_min
+    state_stages = stages * diff + state_min
+
+    normalized_states = copy.deepcopy(states)
+    for i in range(len(states)):
+
+        pos = np.where(state_stages <= states[i])[0]
+        if len(pos) == 0:
+            normalized_states[i] = 1/2
+        else:
+            normalized_states[i] = normalized_stages[pos[-1]]
+
+
+    return normalized_states
+
 
 
 MODELS = {
@@ -218,7 +243,7 @@ MODELS = {
 if __name__ == "__main__":
 
     appos = APgen(500,4,35)
-    uepos = UEgen(appos,500,24,19)
+    uepos = UEgen(appos,500,24,10,paint=True)
     dists = getDist(appos,uepos)
     fading = rayleigh_fading(4,24)
 
@@ -226,6 +251,6 @@ if __name__ == "__main__":
     shadowing = log_norm_shadowing(4,24,7)
     apID = np.argmax(loss,0)
     loss = loss + fading + shadowing
-    acc_rate = getAchRate(loss, 0.01, -134,apID)
+    acc_rate = getAccRate(loss, 0.01, -134,apID)
     acc_rate.sort()
     print(acc_rate,sum(acc_rate))
